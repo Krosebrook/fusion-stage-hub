@@ -1,643 +1,601 @@
-# Architecture Documentation
+# Fusion Stage Hub - Architecture Documentation
 
-## Overview
+**Technical Design & System Architecture**
 
-Fusion Stage Hub is a **multi-tenant, event-driven e-commerce orchestration platform** designed to manage product publishing, inventory synchronization, and order processing across multiple marketplace platforms. This document explains the architectural decisions, system design, and implementation patterns.
+This document provides an in-depth technical overview of Fusion Stage Hub's architecture, design patterns, data flow, and system components.
 
 ---
 
 ## Table of Contents
-
-1. [System Architecture](#system-architecture)
-2. [Data Architecture](#data-architecture)
-3. [Frontend Architecture](#frontend-architecture)
-4. [Backend Architecture](#backend-architecture)
-5. [Plugin System](#plugin-system)
-6. [Job Queue Architecture](#job-queue-architecture)
-7. [Approval Workflow](#approval-workflow)
+1. [System Overview](#system-overview)
+2. [Technology Stack](#technology-stack)
+3. [Architecture Patterns](#architecture-patterns)
+4. [Component Structure](#component-structure)
+5. [Data Flow](#data-flow)
+6. [Database Design](#database-design)
+7. [API Design](#api-design)
 8. [Security Architecture](#security-architecture)
-9. [Scalability Considerations](#scalability-considerations)
-10. [Technology Decisions](#technology-decisions)
+9. [Performance Considerations](#performance-considerations)
+10. [Deployment Architecture](#deployment-architecture)
 
 ---
 
-## System Architecture
+## System Overview
 
 ### High-Level Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                           Client Layer                                │
-│  ┌────────────────────────────────────────────────────────────────┐  │
-│  │  React SPA (TypeScript + Vite)                                 │  │
-│  │  • Pages: Dashboard, Jobs, Stores, Products, Publishing, etc.  │  │
-│  │  • State: TanStack Query (server) + React hooks (local)        │  │
-│  │  • UI: shadcn/ui + Radix UI + Tailwind CSS                     │  │
-│  └────────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────┬───────────────────────────────────┘
-                                   │ HTTPS/WebSocket
-                                   ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                         Supabase Layer                                │
-│  ┌─────────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
-│  │  PostgreSQL     │  │   Auth       │  │  Real-time           │   │
-│  │  • Multi-tenant │  │   • RLS      │  │  • Subscriptions     │   │
-│  │  • RLS policies │  │   • JWT      │  │  • Presence          │   │
-│  │  • JSON indexes │  │   • MFA      │  │  • Broadcast         │   │
-│  └─────────────────┘  └──────────────┘  └──────────────────────┘   │
-│  ┌─────────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
-│  │  Storage        │  │  Functions   │  │  Vault (Secrets)     │   │
-│  │  • Images       │  │  • Workers   │  │  • API keys          │   │
-│  │  • Documents    │  │  • Webhooks  │  │  • OAuth tokens      │   │
-│  └─────────────────┘  └──────────────┘  └──────────────────────┘   │
-└──────────────────────────────────┬───────────────────────────────────┘
-                                   │ REST/GraphQL APIs
-                                   ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                       External Platform APIs                          │
-│  ┌──────────┐  ┌──────────┐  ┌────────────┐  ┌─────────────────┐   │
-│  │ Shopify  │  │   Etsy   │  │  Amazon SC │  │  Printify/etc.  │   │
-│  │ GraphQL  │  │  REST v3 │  │   SP-API   │  │     REST        │   │
-│  └──────────┘  └──────────┘  └────────────┘  └─────────────────┘   │
-└──────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                         Frontend (React)                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │Dashboard │  │Approvals │  │   Jobs   │  │  Stores  │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │           React Query (State Management)             │  │
+│  └──────────────────────────────────────────────────────┘  │
+└───────────────────────┬──────────────────────────────────────┘
+                        │ HTTPS/REST API
+┌───────────────────────▼──────────────────────────────────────┐
+│                    Supabase Backend                          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │PostgreSQL│  │   Auth   │  │ Realtime │  │ Storage  │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└───────────────────────┬──────────────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────────────┐
+│                   Platform Integrations                      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ Shopify  │  │   Etsy   │  │Printify  │  │ Amazon   │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Architectural Principles
+### System Components
 
-1. **Multi-Tenancy First**: All data scoped to organizations with strict isolation
-2. **Event-Driven**: Asynchronous job processing for long-running operations
-3. **Plugin-Based**: Modular platform integrations with capability contracts
-4. **Approval-Driven**: Human-in-the-loop for critical operations
-5. **Observable**: Comprehensive logging and audit trails
-6. **Resilient**: Retry logic, rate limiting, and graceful degradation
+1. **Frontend Application**: React SPA with TypeScript
+2. **Backend Services**: Supabase (PostgreSQL + Auth + Realtime + Storage)
+3. **Platform Plugins**: Integration layer for e-commerce platforms
+4. **Job Queue**: Background task processing system
+5. **Approval Engine**: Workflow orchestration for critical operations
 
 ---
 
-## Data Architecture
+## Technology Stack
 
-### Entity-Relationship Model
+### Frontend Stack
 
-```
-┌──────────────┐
-│     orgs     │ 1:N
-│ (tenant)     ├────────┐
-└──────┬───────┘        │
-       │ 1:N            │
-       │                │
-┌──────▼───────┐  ┌────▼────────┐
-│ org_members  │  │   stores    │ 1:N
-│ (RBAC)       │  │ (platforms) ├──────┐
-└──────────────┘  └────┬────────┘      │
-                       │ 1:N           │
-                       │               │
-                  ┌────▼────────┐ ┌───▼──────────┐
-                  │  products   │ │   jobs       │
-                  │ (catalog)   │ │ (queue)      │
-                  └────┬────────┘ └──────────────┘
-                       │ 1:N
-                  ┌────▼────────┐
-                  │  listings   │
-                  │ (published) │
-                  └─────────────┘
-```
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| React | 18.3.1 | UI framework |
+| TypeScript | 5.8.3 | Type safety |
+| Vite | 5.4.19 | Build tool & dev server |
+| React Router | 6.30.1 | Client-side routing |
+| React Query | 5.83.0 | Server state management |
+| Tailwind CSS | 3.4.17 | Styling framework |
+| shadcn/ui | Latest | Component library |
+| Radix UI | Latest | Accessible primitives |
+| Lucide React | 0.462.0 | Icon library |
+| date-fns | 3.6.0 | Date manipulation |
+| Zod | 3.25.76 | Schema validation |
 
-### Database Tables (Simplified)
+### Backend Stack
 
-#### Core Tables
+| Technology | Purpose |
+|------------|---------|
+| Supabase | Backend-as-a-Service |
+| PostgreSQL | Relational database |
+| PostgREST | Auto-generated REST API |
+| Supabase Auth | Authentication & authorization |
+| Supabase Realtime | WebSocket subscriptions |
+| Supabase Storage | File storage |
 
-**orgs**: Organization/tenant root
-- `id`: UUID (PK)
-- `name`: Text
-- `slug`: Text (unique)
-- `settings`: JSONB (org-wide config)
+### Development Tools
 
-**org_members**: Organization membership with RBAC
-- `org_id`: UUID (FK → orgs)
-- `user_id`: UUID (FK → auth.users)
-- `role`: Enum (owner, operator, viewer)
-
-**stores**: Connected platform accounts
-- `org_id`: UUID (FK → orgs)
-- `platform`: Text (shopify, etsy, amazon-sc, etc.)
-- `external_id`: Text (store ID from platform)
-- `credentials_encrypted`: Text (API keys, OAuth tokens)
-- `rate_limit_state`: JSONB (token bucket state)
-- `last_synced_at`: Timestamp
-
-#### Plugin System
-
-**plugins**: Available platform integrations
-- `slug`: Text (unique) - e.g., "shopify", "etsy"
-- `name`: Text - "Shopify"
-- `version`: Text - "2.1.0"
-
-**plugin_contracts**: Capability matrix
-- `plugin_id`: UUID (FK → plugins)
-- `capability`: Text - "list_products", "bulk_update", etc.
-- `level`: Enum (native, workaround, unsupported)
-- `constraints`: JSONB - rate limits, batch sizes
-
-**plugin_instances**: Per-store plugin config
-- `store_id`: UUID (FK → stores)
-- `plugin_id`: UUID (FK → plugins)
-- `config`: JSONB (store-specific settings)
-
-#### Job Queue
-
-**jobs**: Asynchronous task queue
-- `org_id`: UUID (FK → orgs)
-- `store_id`: UUID (FK → stores) - nullable
-- `type`: Text - "sync_inventory", "publish_listing"
-- `status`: Enum (pending, claimed, running, completed, failed, cancelled)
-- `payload`: JSONB (job parameters)
-- `scheduled_at`: Timestamp (for delayed execution)
-- `attempts`: Int (retry counter)
-- `max_attempts`: Int
-- `claimed_by`: Text (worker ID)
-- `claimed_at`: Timestamp
-
-**job_logs**: Execution history
-- `job_id`: UUID (FK → jobs)
-- `level`: Enum (info, warning, error)
-- `message`: Text
-- `metadata`: JSONB
-
-#### Approval Workflow
-
-**approvals**: Change approval requests
-- `org_id`: UUID (FK → orgs)
-- `resource_type`: Text - "product", "listing"
-- `resource_id`: UUID
-- `action`: Text - "publish", "update", "delete"
-- `status`: Enum (pending, approved, rejected, expired)
-- `requested_by`: UUID (FK → profiles)
-- `decided_by`: UUID (FK → profiles) - nullable
-- `payload`: JSONB (change details)
-- `expires_at`: Timestamp
-
-**approval_policies**: Org-level rules
-- `org_id`: UUID (FK → orgs)
-- `resource_type`: Text
-- `action`: Text
-- `requires_approval`: Boolean
-- `auto_approve_threshold`: JSONB (criteria)
-
-#### Product & Publishing
-
-**products**: Unified product catalog
-- `org_id`: UUID (FK → orgs)
-- `title`: Text
-- `description`: Text
-- `category`: Text
-- `tags`: Text[]
-- `base_price`: Numeric
-- `metadata`: JSONB (custom fields)
-
-**product_variants**: SKU management
-- `product_id`: UUID (FK → products)
-- `sku`: Text (unique within org)
-- `attributes`: JSONB - {"size": "L", "color": "blue"}
-- `price`: Numeric
-- `inventory_qty`: Int
-
-**listings**: Store-specific published products
-- `product_id`: UUID (FK → products)
-- `store_id`: UUID (FK → stores)
-- `external_id`: Text (ID on platform)
-- `status`: Enum (draft, staged, publishing, published, failed, delisted)
-- `platform_data`: JSONB (platform-specific fields)
-- `published_at`: Timestamp
-
-### Indexes and Performance
-
-**Composite Indexes:**
-- `(org_id, created_at DESC)` on most tables for paginated queries
-- `(store_id, status)` on jobs for queue polling
-- `(org_id, status, expires_at)` on approvals for dashboard
-
-**JSONB Indexes:**
-- GIN index on `payload` in jobs for JSON queries
-- GIN index on `platform_data` in listings
-
-**Partitioning (Future):**
-- Partition `job_logs` by month for archival
-- Partition `audit_logs` by quarter
+| Tool | Purpose |
+|------|---------|
+| ESLint | Code linting |
+| TypeScript ESLint | TS-specific linting |
+| PostCSS | CSS processing |
+| Autoprefixer | CSS vendor prefixes |
+| Lovable Tagger | Component tracking |
 
 ---
 
-## Frontend Architecture
+## Architecture Patterns
 
-### Component Hierarchy
+### 1. Plugin-Based Architecture
 
-```
-App
-├── QueryClientProvider (TanStack Query)
-├── TooltipProvider (Radix UI)
-├── BrowserRouter
-│   └── Routes
-│       ├── Dashboard
-│       │   └── AppLayout
-│       │       ├── Sidebar
-│       │       ├── Header
-│       │       └── MetricCard[]
-│       ├── Jobs
-│       │   └── AppLayout
-│       │       └── JobTable
-│       ├── Stores
-│       │   └── AppLayout
-│       │       └── StoreCard[]
-│       └── [other pages]
-├── Toaster (sonner notifications)
-└── Toaster (shadcn toast)
-```
-
-### State Management Strategy
-
-**Server State (TanStack Query):**
-- API calls to Supabase
-- Real-time subscriptions
-- Optimistic updates
-- Cache invalidation
-
-**Local State (React useState/useReducer):**
-- Form inputs
-- UI toggles (sidebar collapsed, modals)
-- Filters and search
-
-**URL State (React Router):**
-- Current page
-- Query parameters for filters
-- Pagination
-
-### Data Flow
-
-```
-User Action
-    │
-    ▼
-Component Event Handler
-    │
-    ▼
-TanStack Query Mutation
-    │
-    ▼
-Supabase Client
-    │
-    ▼
-PostgreSQL + RLS
-    │
-    ▼
-Real-time Subscription (optional)
-    │
-    ▼
-Auto Cache Update
-    │
-    ▼
-UI Re-render
-```
-
-### Component Design Patterns
-
-**Composition over Inheritance:**
-```tsx
-<AppLayout>
-  <PageContent>
-    <Card>
-      <CardHeader>
-        <CardTitle>Jobs</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <JobTable />
-      </CardContent>
-    </Card>
-  </PageContent>
-</AppLayout>
-```
-
-**Render Props for Flexibility:**
-```tsx
-<DataTable
-  data={jobs}
-  columns={columns}
-  renderRow={(job) => <JobRow job={job} />}
-/>
-```
-
-**Custom Hooks for Logic Reuse:**
-```tsx
-function useJobQueue(storeId?: string) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['jobs', storeId],
-    queryFn: () => fetchJobs(storeId),
-  });
-  return { jobs: data, loading: isLoading };
-}
-```
-
----
-
-## Backend Architecture
-
-### Supabase Edge Functions (Planned)
-
-**Job Worker Function** (`/functions/job-worker`)
-```typescript
-// Polls jobs table, claims pending jobs, executes, updates status
-Deno.serve(async (req) => {
-  const job = await claimNextJob();
-  if (job) {
-    try {
-      await executeJob(job);
-      await markJobCompleted(job.id);
-    } catch (err) {
-      await markJobFailed(job.id, err);
-    }
-  }
-  return new Response("OK");
-});
-```
-
-**Webhook Handler** (`/functions/webhook`)
-```typescript
-// Receives webhooks from platforms (Shopify order created, etc.)
-Deno.serve(async (req) => {
-  const signature = req.headers.get("X-Shopify-Hmac-SHA256");
-  const payload = await req.json();
-  
-  // Verify signature
-  if (!verifySignature(payload, signature)) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-  
-  // Insert webhook log
-  await supabase.from("webhooks").insert({
-    platform: "shopify",
-    event: payload.type,
-    payload,
-  });
-  
-  // Enqueue processing job
-  await enqueueJob("process_webhook", { webhook_id: ... });
-  
-  return new Response("OK");
-});
-```
-
-**Approval Expiry Function** (`/functions/expire-approvals`)
-```typescript
-// Scheduled via pg_cron to run every 5 minutes
-Deno.serve(async (req) => {
-  await supabase
-    .from("approvals")
-    .update({ status: "expired" })
-    .eq("status", "pending")
-    .lt("expires_at", new Date().toISOString());
-  
-  return new Response("OK");
-});
-```
-
-### Database Functions (PostgreSQL)
-
-**Enqueue Job**
-```sql
-CREATE FUNCTION enqueue_job(
-  p_org_id UUID,
-  p_type TEXT,
-  p_payload JSONB,
-  p_scheduled_at TIMESTAMPTZ DEFAULT NOW()
-) RETURNS UUID AS $$
-  INSERT INTO jobs (org_id, type, payload, scheduled_at)
-  VALUES (p_org_id, p_type, p_payload, p_scheduled_at)
-  RETURNING id;
-$$ LANGUAGE SQL;
-```
-
-**Claim Next Job (with locking)**
-```sql
-CREATE FUNCTION claim_next_job(p_worker_id TEXT) RETURNS jobs AS $$
-  UPDATE jobs
-  SET 
-    status = 'claimed',
-    claimed_by = p_worker_id,
-    claimed_at = NOW()
-  WHERE id = (
-    SELECT id FROM jobs
-    WHERE status = 'pending'
-      AND scheduled_at <= NOW()
-    ORDER BY scheduled_at ASC
-    LIMIT 1
-    FOR UPDATE SKIP LOCKED
-  )
-  RETURNING *;
-$$ LANGUAGE SQL;
-```
-
-### Row Level Security (RLS) Policies
-
-**Example: jobs table**
-```sql
--- Users can only see jobs in their org
-CREATE POLICY "Users can view own org jobs"
-ON jobs FOR SELECT
-USING (org_id IN (
-  SELECT org_id FROM org_members
-  WHERE user_id = auth.uid()
-));
-
--- Only operators/owners can create jobs
-CREATE POLICY "Operators can create jobs"
-ON jobs FOR INSERT
-WITH CHECK (org_id IN (
-  SELECT org_id FROM org_members
-  WHERE user_id = auth.uid()
-    AND role IN ('owner', 'operator')
-));
-```
-
----
-
-## Plugin System
-
-### Capability Matrix
-
-Each plugin declares which capabilities it supports and at what level:
-
-| Capability | Shopify | Etsy | Amazon SC | Printify |
-|------------|---------|------|-----------|----------|
-| list_products | Native | Native | Native | Native |
-| create_product | Native | Native | Native | Workaround |
-| update_product | Native | Native | Native | Workaround |
-| delete_product | Native | Native | Native | Unsupported |
-| bulk_operations | Native | Workaround | Native | Unsupported |
-| real_time_inventory | Native | Unsupported | Workaround | Native |
-| order_webhooks | Native | Native | Native | Native |
-
-### Plugin Interface (Conceptual)
+Each platform integration is designed as a plugin with a standard interface:
 
 ```typescript
-interface Plugin {
+interface PlatformPlugin {
+  // Metadata
   slug: string;
   name: string;
   version: string;
   
-  // Capability implementation
+  // Capabilities
   capabilities: {
-    list_products: (config: StoreConfig) => Promise<Product[]>;
-    create_product: (config: StoreConfig, product: Product) => Promise<string>;
-    // ... other capabilities
+    [operation: string]: {
+      level: 'native' | 'workaround' | 'unsupported';
+      description?: string;
+    };
   };
   
-  // Rate limiting constraints
-  rateLimit: {
-    requestsPerSecond: number;
-    burstSize: number;
-    costFunction?: (capability: string) => number;
+  // Constraints
+  constraints?: {
+    rateLimits?: RateLimit;
+    batchSize?: number;
+    asyncOperations?: boolean;
   };
   
-  // Authentication
-  auth: {
-    type: "oauth" | "api_key";
-    setup: (credentials: unknown) => Promise<void>;
-  };
+  // Core Methods
+  authenticate(credentials: Credentials): Promise<AuthResult>;
+  listProducts(options?: ListOptions): Promise<Product[]>;
+  createProduct(data: ProductInput): Promise<Product>;
+  updateProduct(id: string, data: Partial<ProductInput>): Promise<Product>;
+  deleteProduct(id: string): Promise<void>;
+  syncInventory(productId: string): Promise<InventorySync>;
+  processOrder(orderId: string): Promise<Order>;
 }
 ```
 
-### Rate Limiting Implementation
+**Benefits**:
+- Consistent interface across platforms
+- Easy to add new integrations
+- Capability-aware system (knows what each platform can/can't do)
+- Graceful degradation for unsupported features
 
-**Token Bucket Algorithm** (stored in `stores.rate_limit_state`):
-```json
-{
-  "tokens": 850,
-  "capacity": 1000,
-  "refill_rate": 10,
-  "last_refill": "2024-12-30T12:00:00Z"
-}
+### 2. Approval-First Workflow
+
+All critical operations (publish, update, delete) go through an approval queue:
+
+```typescript
+// Operation Flow
+User Action → Create Approval Request → Pending Queue
+                                          ↓
+                                    Reviewer Action
+                                          ↓
+                            Approve ←────┴────→ Reject
+                                ↓                  ↓
+                          Create Job         Discard
+                                ↓
+                          Job Queue
+                                ↓
+                        Execute Operation
 ```
 
-Before each API call:
-1. Check if tokens available
-2. If yes, decrement tokens and proceed
-3. If no, delay or queue job
-4. Refill tokens based on elapsed time
+**Benefits**:
+- Risk mitigation for critical operations
+- Audit trail of all decisions
+- Multi-level approval chains
+- Configurable approval policies
+
+### 3. Job Queue System
+
+Asynchronous background processing for long-running operations:
+
+```typescript
+interface Job {
+  id: string;
+  type: JobType;
+  status: 'pending' | 'claimed' | 'running' | 'completed' | 'failed' | 'cancelled';
+  payload: unknown;
+  attempts: number;
+  maxAttempts: number;
+  scheduledAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  error?: string;
+  metadata: JobMetadata;
+}
+
+// Job Lifecycle
+Create Job → Pending → Claimed → Running → Completed/Failed
+                ↑                            ↓
+                └──────── Retry ─────────────┘
+```
+
+**Features**:
+- Priority queues
+- Retry logic with exponential backoff
+- Dead letter queue for persistent failures
+- Job dependencies and chaining
+- Pause/resume capabilities
+
+### 4. Component Architecture
+
+Following atomic design principles:
+
+```
+Atoms (ui/)
+  ↓
+Molecules (dashboard/, jobs/, approvals/)
+  ↓
+Organisms (layout/)
+  ↓
+Templates (pages/)
+  ↓
+Pages (App.tsx routes)
+```
+
+**Component Hierarchy**:
+- **Atoms**: Basic UI elements (Button, Input, Badge)
+- **Molecules**: Simple component groups (MetricCard, StatusIndicator)
+- **Organisms**: Complex components (Sidebar, ApprovalCard, JobTable)
+- **Templates**: Page layouts (AppLayout)
+- **Pages**: Full pages with data fetching
 
 ---
 
-## Job Queue Architecture
+## Component Structure
 
-### Job Lifecycle
+### File Organization
 
 ```
-pending → claimed → running → completed
-                      ↓
-                    failed → (retry) → pending
-                      ↓ (max attempts)
-                   failed (permanent)
+src/
+├── components/
+│   ├── ui/                    # Atomic components (shadcn/ui)
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   └── ...
+│   ├── dashboard/             # Dashboard-specific components
+│   │   ├── MetricCard.tsx
+│   │   └── StatusIndicator.tsx
+│   ├── approvals/             # Approval components
+│   │   └── ApprovalCard.tsx
+│   ├── jobs/                  # Job components
+│   │   └── JobStatusBadge.tsx
+│   ├── plugins/               # Plugin components
+│   │   └── CapabilityBadge.tsx
+│   └── layout/                # Layout components
+│       ├── AppLayout.tsx
+│       ├── Sidebar.tsx
+│       └── Header.tsx
+├── pages/                     # Page components
+│   ├── Dashboard.tsx
+│   ├── Approvals.tsx
+│   ├── Jobs.tsx
+│   └── ...
+├── hooks/                     # Custom React hooks
+│   └── use-toast.ts
+├── lib/                       # Utilities
+│   └── utils.ts
+└── integrations/              # Third-party integrations
+    └── supabase/
+        ├── client.ts
+        └── types.ts
+```
+
+### Component Patterns
+
+#### 1. Page Components
+```typescript
+// Pattern: Page with AppLayout wrapper
+export default function PageName() {
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Page content */}
+      </div>
+    </AppLayout>
+  );
+}
+```
+
+#### 2. Data Fetching
+```typescript
+// Pattern: React Query for server state
+const { data, isLoading, error } = useQuery({
+  queryKey: ['jobs', filters],
+  queryFn: () => fetchJobs(filters),
+  staleTime: 30000, // 30 seconds
+});
+```
+
+#### 3. Form Handling
+```typescript
+// Pattern: React Hook Form + Zod validation
+const form = useForm<FormData>({
+  resolver: zodResolver(formSchema),
+  defaultValues: {},
+});
+
+const onSubmit = async (data: FormData) => {
+  // Handle submission
+};
+```
+
+---
+
+## Data Flow
+
+### Request Flow
+
+```
+User Action
+    ↓
+React Component
+    ↓
+React Query Mutation/Query
+    ↓
+Supabase Client
+    ↓
+PostgREST API
+    ↓
+PostgreSQL
+    ↓
+Response
+    ↓
+React Query Cache
+    ↓
+Component Re-render
+```
+
+### Real-time Updates
+
+```
+Database Change (INSERT/UPDATE/DELETE)
+    ↓
+PostgreSQL Trigger
+    ↓
+Supabase Realtime
+    ↓
+WebSocket
+    ↓
+React Query Invalidation
+    ↓
+Component Re-render with Fresh Data
 ```
 
 ### Job Processing Flow
 
-1. **Enqueue**: Insert job with `status='pending'`
-2. **Claim**: Worker claims job with `FOR UPDATE SKIP LOCKED`
-3. **Execute**: Worker calls plugin capability
-4. **Log**: Write progress to `job_logs`
-5. **Complete/Fail**: Update job status
-6. **Retry**: If failed and attempts < max_attempts, reset to pending with delay
-
-### Worker Implementation (Pseudo-code)
-
-```typescript
-while (true) {
-  const job = await claimNextJob(workerId);
-  
-  if (!job) {
-    await sleep(POLL_INTERVAL);
-    continue;
-  }
-  
-  try {
-    const plugin = getPlugin(job.payload.platform);
-    const result = await plugin.execute(job.type, job.payload);
-    
-    await logJobProgress(job.id, "info", "Completed successfully");
-    await markJobCompleted(job.id, result);
-  } catch (err) {
-    await logJobProgress(job.id, "error", err.message);
-    
-    if (job.attempts < job.max_attempts) {
-      const delay = exponentialBackoff(job.attempts);
-      await retryJob(job.id, delay);
-    } else {
-      await markJobFailed(job.id, "Max attempts exceeded");
-    }
-  }
-}
 ```
-
-### Scheduled Jobs
-
-Use `scheduled_at` column for delayed execution:
-- **Recurring syncs**: Schedule inventory sync every 15 minutes
-- **Batch operations**: Schedule heavy operations during off-peak hours
-- **Retry delays**: Exponential backoff (1m, 5m, 15m, 1h)
+User Action → Approval → Job Creation → Job Queue
+                                            ↓
+                                     Job Worker Claims
+                                            ↓
+                                  Execute Platform API
+                                            ↓
+                                     Success/Failure
+                                            ↓
+                                   Update Job Status
+                                            ↓
+                              Trigger Realtime Update
+                                            ↓
+                                 UI Reflects Status
+```
 
 ---
 
-## Approval Workflow
+## Database Design
 
-### Approval Process
+### Entity Relationship Diagram
 
 ```
-User Action → Check Policy → Requires Approval?
-                                │
-                        Yes ─────┼───── No
-                        │               │
-                  Create Approval   Execute Directly
-                        │
-                  Notify Approvers
-                        │
-          ┌─────────────┴─────────────┐
-          │                           │
-    Approve Decision            Reject Decision
-          │                           │
-    Execute Action              Cancel Action
-          │                           │
-    Log Audit                   Log Audit
+users (Supabase Auth)
+  ↓
+  ├─→ stores (one-to-many)
+  │     ↓
+  │     ├─→ products (one-to-many)
+  │     │     ↓
+  │     │     └─→ listings (one-to-many)
+  │     │           ↓
+  │     │           └─→ inventory_logs
+  │     │
+  │     └─→ sync_logs (one-to-many)
+  │
+  ├─→ approvals (one-to-many)
+  │     ↓
+  │     └─→ approval_history
+  │
+  ├─→ jobs (one-to-many)
+  │     ↓
+  │     └─→ job_logs
+  │
+  └─→ audit_logs (one-to-many)
 ```
 
-### Policy Evaluation
+### Core Tables
+
+#### stores
+```sql
+CREATE TABLE stores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users NOT NULL,
+  platform TEXT NOT NULL, -- 'shopify', 'etsy', etc.
+  name TEXT NOT NULL,
+  credentials JSONB NOT NULL, -- Encrypted credentials
+  config JSONB DEFAULT '{}'::jsonb,
+  status TEXT DEFAULT 'active', -- 'active', 'disconnected', 'error'
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_stores_user_id ON stores(user_id);
+CREATE INDEX idx_stores_platform ON stores(platform);
+```
+
+#### products
+```sql
+CREATE TABLE products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users NOT NULL,
+  sku TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  images JSONB DEFAULT '[]'::jsonb,
+  variants JSONB DEFAULT '[]'::jsonb,
+  tags TEXT[],
+  status TEXT DEFAULT 'draft', -- 'draft', 'staged', 'published'
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_products_user_id ON products(user_id);
+CREATE INDEX idx_products_sku ON products(sku);
+CREATE INDEX idx_products_status ON products(status);
+```
+
+#### listings
+```sql
+CREATE TABLE listings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id UUID REFERENCES products NOT NULL,
+  store_id UUID REFERENCES stores NOT NULL,
+  external_id TEXT NOT NULL, -- Platform's listing ID
+  price DECIMAL(10, 2) NOT NULL,
+  inventory INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'active', -- 'active', 'inactive', 'out_of_stock'
+  platform_data JSONB DEFAULT '{}'::jsonb,
+  synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(store_id, external_id)
+);
+
+CREATE INDEX idx_listings_product_id ON listings(product_id);
+CREATE INDEX idx_listings_store_id ON listings(store_id);
+```
+
+#### approvals
+```sql
+CREATE TABLE approvals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users NOT NULL,
+  resource_type TEXT NOT NULL, -- 'listing', 'product', 'store'
+  resource_id UUID,
+  action TEXT NOT NULL, -- 'create', 'update', 'delete', 'publish'
+  payload JSONB NOT NULL,
+  status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+  reviewed_by UUID REFERENCES auth.users,
+  reviewed_at TIMESTAMPTZ,
+  comments TEXT,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_approvals_status ON approvals(status);
+CREATE INDEX idx_approvals_user_id ON approvals(user_id);
+```
+
+#### jobs
+```sql
+CREATE TABLE jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users NOT NULL,
+  type TEXT NOT NULL, -- 'sync_inventory', 'publish_listing', etc.
+  status TEXT DEFAULT 'pending',
+  payload JSONB NOT NULL,
+  result JSONB,
+  error TEXT,
+  attempts INTEGER DEFAULT 0,
+  max_attempts INTEGER DEFAULT 3,
+  priority INTEGER DEFAULT 0,
+  scheduled_at TIMESTAMPTZ DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_jobs_status ON jobs(status);
+CREATE INDEX idx_jobs_scheduled_at ON jobs(scheduled_at);
+CREATE INDEX idx_jobs_user_id ON jobs(user_id);
+```
+
+#### audit_logs
+```sql
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users,
+  action TEXT NOT NULL,
+  resource_type TEXT NOT NULL,
+  resource_id UUID,
+  changes JSONB,
+  ip_address INET,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+```
+
+---
+
+## API Design
+
+### REST API (Supabase PostgREST)
+
+All API endpoints follow RESTful conventions:
+
+```
+GET    /stores              List all stores
+GET    /stores/:id          Get store details
+POST   /stores              Create new store
+PATCH  /stores/:id          Update store
+DELETE /stores/:id          Delete store
+
+GET    /products            List all products
+GET    /products/:id        Get product details
+POST   /products            Create product
+PATCH  /products/:id        Update product
+DELETE /products/:id        Delete product
+
+GET    /approvals           List approvals
+POST   /approvals           Create approval
+PATCH  /approvals/:id       Update approval (approve/reject)
+
+GET    /jobs                List jobs
+GET    /jobs/:id            Get job details
+POST   /jobs                Create job
+PATCH  /jobs/:id            Update job status
+```
+
+### Query Parameters
 
 ```typescript
-function requiresApproval(
-  orgId: string,
-  action: string,
-  resourceType: string,
-  payload: unknown
-): boolean {
-  const policy = getPolicyFor(orgId, resourceType, action);
-  
-  if (!policy || !policy.requires_approval) {
-    return false;
-  }
-  
-  // Check auto-approve criteria
-  if (policy.auto_approve_threshold) {
-    return !meetsThreshold(payload, policy.auto_approve_threshold);
-  }
-  
-  return true;
+// Filtering
+GET /jobs?status=eq.pending
+
+// Sorting
+GET /jobs?order=created_at.desc
+
+// Pagination
+GET /jobs?limit=20&offset=40
+
+// Select specific fields
+GET /products?select=id,title,sku
+
+// Complex queries
+GET /jobs?status=eq.pending&type=in.(sync_inventory,publish_listing)
+```
+
+### Response Format
+
+```json
+{
+  "data": [...],
+  "count": 100,
+  "page": 1,
+  "pageSize": 20
 }
 ```
 
-**Example Policy**:
+### Error Response
+
 ```json
 {
-  "resource_type": "listing",
-  "action": "publish",
-  "requires_approval": true,
-  "auto_approve_threshold": {
-    "max_price": 50,
-    "max_quantity": 10
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid product data",
+    "details": {
+      "field": "sku",
+      "issue": "SKU already exists"
+    }
   }
 }
 ```
@@ -650,164 +608,177 @@ function requiresApproval(
 
 ```
 User Login
-    │
-    ▼
+    ↓
 Supabase Auth
-    │
-    ▼
-JWT issued
-    │
-    ▼
-Client stores JWT in memory
-    │
-    ▼
-All requests include JWT
-    │
-    ▼
-RLS policies validate auth.uid()
+    ↓
+JWT Token (Access + Refresh)
+    ↓
+Store in HTTP-only Cookie
+    ↓
+Include in API Requests (Authorization Header)
+    ↓
+Supabase Validates JWT
+    ↓
+Access Granted/Denied
 ```
 
-### Data Isolation
+### Row Level Security (RLS)
 
-**Organization Scoping**:
-- All queries filtered by `org_id`
-- RLS policies enforce at database level
-- No cross-org data leakage possible
+```sql
+-- Users can only see their own stores
+CREATE POLICY "Users can view own stores"
+  ON stores FOR SELECT
+  USING (auth.uid() = user_id);
 
-**Role-Based Access**:
-- `owner`: Full access, can manage members
-- `operator`: Can create/update, requires approval for deletes
-- `viewer`: Read-only access
+-- Users can only create stores for themselves
+CREATE POLICY "Users can create own stores"
+  ON stores FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
-### Credential Management
+-- Users can only update their own stores
+CREATE POLICY "Users can update own stores"
+  ON stores FOR UPDATE
+  USING (auth.uid() = user_id);
+```
 
-**API Keys/OAuth Tokens**:
-- Stored in `stores.credentials_encrypted`
-- Encrypted using Supabase Vault
-- Never exposed to frontend
-- Edge Functions decrypt for API calls
+### API Key Security
 
-**Audit Logging**:
-- All write operations logged
-- Includes user, timestamp, before/after state
-- Immutable append-only log
+```typescript
+// Store encrypted in database
+interface StoreCredentials {
+  apiKey: string; // Encrypted with Supabase Vault
+  apiSecret: string; // Encrypted
+  shopDomain?: string;
+  // Never exposed to frontend
+}
 
----
+// Decrypt only in secure Supabase functions
+const decryptedKey = await vault.decrypt(credentials.apiKey);
+```
 
-## Scalability Considerations
+### Security Best Practices
 
-### Current Bottlenecks (MVP)
-
-1. **Single Worker**: Job processing limited to one Edge Function instance
-2. **No Caching**: Every query hits database
-3. **No CDN**: Static assets served directly
-4. **No Connection Pooling**: Direct Supabase client connections
-
-### Scaling Strategy (Future)
-
-**Horizontal Scaling**:
-- Multiple worker instances with distributed locking
-- Job partitioning by org_id or store_id
-- Read replicas for heavy queries
-
-**Caching Layer**:
-- Redis for session state and job queue
-- CDN for static assets (Cloudflare)
-- Query result caching with TTL
-
-**Database Optimization**:
-- Connection pooling (PgBouncer)
-- Table partitioning (by time)
-- Materialized views for analytics
-
-**Rate Limiting**:
-- Per-org API quotas
-- Distributed rate limiting (Redis)
-- Queue backpressure handling
+1. **Never store API keys in frontend code**
+2. **Use environment variables for sensitive config**
+3. **Implement rate limiting per user**
+4. **Validate all inputs with Zod schemas**
+5. **Sanitize user-generated content**
+6. **Use HTTPS only**
+7. **Implement CSRF protection**
+8. **Regular security audits**
 
 ---
 
-## Technology Decisions
+## Performance Considerations
 
-### Why React?
-- ✅ Large ecosystem and talent pool
-- ✅ Excellent TypeScript support
-- ✅ Component reusability
-- ✅ Great devtools and debugging
+### Frontend Optimization
 
-### Why Vite?
-- ✅ Fast HMR (Hot Module Replacement)
-- ✅ ESM-first approach
-- ✅ Plugin ecosystem
-- ✅ Production-ready build optimization
+1. **Code Splitting**: Lazy load routes
+   ```typescript
+   const Dashboard = lazy(() => import('./pages/Dashboard'));
+   ```
 
-### Why Supabase?
-- ✅ Managed PostgreSQL (no ops overhead)
-- ✅ Built-in auth with RLS
-- ✅ Real-time subscriptions
-- ✅ Edge Functions (Deno runtime)
-- ✅ Generous free tier
-- ⚠️ Vendor lock-in (mitigated by standard Postgres)
+2. **React Query Caching**: Minimize API calls
+   ```typescript
+   staleTime: 5 * 60 * 1000, // 5 minutes
+   cacheTime: 10 * 60 * 1000, // 10 minutes
+   ```
 
-### Why PostgreSQL?
-- ✅ ACID compliance (critical for e-commerce)
-- ✅ JSONB for flexible schemas
-- ✅ Advanced indexing (GIN, GiST)
-- ✅ Row Level Security
-- ✅ Mature ecosystem
+3. **Memoization**: Prevent unnecessary re-renders
+   ```typescript
+   const memoizedValue = useMemo(() => expensiveCalc(), [deps]);
+   ```
 
-### Why TanStack Query?
-- ✅ Automatic caching and deduplication
-- ✅ Optimistic updates
-- ✅ Background refetching
-- ✅ Request cancellation
-- ✅ DevTools for debugging
+4. **Virtual Scrolling**: For large lists
+   ```typescript
+   <VirtualList items={products} height={600} itemHeight={80} />
+   ```
 
-### Why shadcn/ui?
-- ✅ Copy-paste components (no npm bloat)
-- ✅ Full TypeScript support
-- ✅ Accessibility via Radix UI
-- ✅ Customizable (Tailwind)
-- ✅ High-quality components
+### Backend Optimization
 
-### Why Not X?
+1. **Database Indexes**: On frequently queried fields
+2. **Connection Pooling**: Reuse database connections
+3. **Query Optimization**: Select only needed fields
+4. **Pagination**: Limit result sets
+5. **Caching**: Redis for frequently accessed data
 
-**Why not Next.js?**
-- No need for SSR (internal tool)
-- Simpler deployment (SPA)
-- Edge Functions replace API routes
+### Monitoring
 
-**Why not Redux?**
-- TanStack Query handles server state
-- Local state simple enough for hooks
-- Avoids boilerplate
-
-**Why not MongoDB?**
-- E-commerce needs ACID transactions
-- Relational data (orgs → stores → products)
-- PostgreSQL JSONB provides flexibility
+- **Frontend**: Lighthouse, Web Vitals
+- **Backend**: Supabase Dashboard, PostgreSQL slow query log
+- **Error Tracking**: Sentry
+- **Performance Monitoring**: DataDog/New Relic
 
 ---
 
-## Future Architecture Evolution
+## Deployment Architecture
 
-### v0.5.0: Event Sourcing
-- Event store for audit trail
-- Event replay for debugging
-- CQRS for read/write separation
+### Development Environment
 
-### v1.0.0: Microservices (Maybe)
-- Separate services per platform
-- Message queue (RabbitMQ/SQS)
-- API Gateway (Kong/AWS API Gateway)
+```
+Local Machine
+    ↓
+Vite Dev Server (localhost:8080)
+    ↓
+Supabase Local (Docker)
+```
 
-### v2.0.0: Multi-Region
-- Regional databases
-- Global CDN
-- Active-active replication
+### Staging Environment
+
+```
+GitHub → Vercel Preview Deploy
+              ↓
+         Supabase Staging Project
+              ↓
+         Platform Test Accounts
+```
+
+### Production Environment
+
+```
+GitHub Main Branch
+    ↓
+Vercel Production Deploy
+    ↓
+CDN (Edge Network)
+    ↓
+Supabase Production
+    ↓
+Platform Production APIs
+```
+
+### CI/CD Pipeline
+
+```
+git push → GitHub Actions
+              ↓
+         Run Tests
+              ↓
+         Run Linter
+              ↓
+         Build Application
+              ↓
+         Deploy to Vercel
+              ↓
+         Run E2E Tests
+              ↓
+         Notify Team
+```
 
 ---
 
-**Last Updated**: 2024-12-30  
-**Author**: Architecture Team  
-**Status**: Living Document
+## Conclusion
+
+This architecture is designed for:
+- **Scalability**: Handle growing user base and data volume
+- **Maintainability**: Clean code structure and patterns
+- **Extensibility**: Easy to add new features and integrations
+- **Security**: Multiple layers of protection
+- **Performance**: Optimized for speed and efficiency
+- **Reliability**: Error handling and monitoring at every level
+
+---
+
+**Document Version**: 1.0  
+**Last Updated**: December 30, 2024  
+**Next Review**: February 2025

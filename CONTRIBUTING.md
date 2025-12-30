@@ -1,211 +1,249 @@
-# Contributing to Fusion Stage Hub
+# Contributing to FlashFusion
 
-Thank you for your interest in contributing to Fusion Stage Hub! This document provides guidelines and instructions for contributing to the project.
-
----
-
-## Table of Contents
-
-1. [Code of Conduct](#code-of-conduct)
-2. [Getting Started](#getting-started)
-3. [Development Workflow](#development-workflow)
-4. [Coding Standards](#coding-standards)
-5. [Testing Guidelines](#testing-guidelines)
-6. [Pull Request Process](#pull-request-process)
-7. [Issue Reporting](#issue-reporting)
-8. [Community](#community)
-
----
+First off, thank you for considering contributing to FlashFusion! It's people like you that make FlashFusion such a great tool.
 
 ## Code of Conduct
 
+This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
+
 ### Our Pledge
 
-We are committed to providing a welcoming and inclusive environment for all contributors. We expect all participants to:
+We pledge to make participation in our project and our community a harassment-free experience for everyone, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
-- Be respectful and considerate
-- Welcome newcomers and help them get started
-- Accept constructive criticism gracefully
-- Focus on what is best for the community
-- Show empathy towards other community members
+### Our Standards
 
-### Unacceptable Behavior
+**Positive behaviors include:**
+- Using welcoming and inclusive language
+- Being respectful of differing viewpoints and experiences
+- Gracefully accepting constructive criticism
+- Focusing on what is best for the community
+- Showing empathy towards other community members
 
-- Harassment, discrimination, or inappropriate comments
-- Trolling, insulting, or derogatory remarks
-- Publishing others' private information
-- Other conduct deemed unprofessional
+**Unacceptable behaviors include:**
+- Trolling, insulting/derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information without explicit permission
+- Other conduct which could reasonably be considered inappropriate in a professional setting
 
-Report violations to the project maintainers.
+## How Can I Contribute?
 
----
+### Reporting Bugs
 
-## Getting Started
+Before creating bug reports, please check the existing issues to avoid duplicates. When creating a bug report, include as many details as possible:
 
-### Prerequisites
+**Bug Report Template:**
+```markdown
+**Describe the bug**
+A clear and concise description of what the bug is.
 
-Ensure you have the following installed:
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
 
-- **Node.js** 18+ ([nvm](https://github.com/nvm-sh/nvm) recommended)
-- **npm** 9+ or **bun** (optional, faster)
-- **Git** for version control
-- **Supabase CLI** (for database work)
+**Expected behavior**
+A clear and concise description of what you expected to happen.
 
-### Fork and Clone
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
 
-1. **Fork** the repository on GitHub
-2. **Clone** your fork locally:
+**Environment:**
+ - OS: [e.g. Windows, macOS, Linux]
+ - Browser: [e.g. Chrome, Safari]
+ - Version: [e.g. 1.0.0]
+
+**Additional context**
+Add any other context about the problem here.
+```
+
+### Suggesting Enhancements
+
+Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, include:
+
+**Enhancement Template:**
+```markdown
+**Is your feature request related to a problem?**
+A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+
+**Describe the solution you'd like**
+A clear and concise description of what you want to happen.
+
+**Describe alternatives you've considered**
+A clear and concise description of any alternative solutions or features you've considered.
+
+**Additional context**
+Add any other context or screenshots about the feature request here.
+```
+
+### Pull Requests
+
+1. **Fork the Repository**
    ```bash
    git clone https://github.com/YOUR_USERNAME/fusion-stage-hub.git
    cd fusion-stage-hub
    ```
 
-3. **Add upstream** remote:
+2. **Create a Branch**
    ```bash
-   git remote add upstream https://github.com/Krosebrook/fusion-stage-hub.git
+   git checkout -b feature/your-feature-name
+   # or
+   git checkout -b fix/your-bug-fix
    ```
 
-### Environment Setup
+   Branch naming conventions:
+   - `feature/` - New features
+   - `fix/` - Bug fixes
+   - `docs/` - Documentation changes
+   - `refactor/` - Code refactoring
+   - `test/` - Adding or updating tests
+   - `chore/` - Maintenance tasks
 
-1. **Install dependencies:**
+3. **Set Up Development Environment**
    ```bash
    npm install
-   # or
-   bun install
-   ```
-
-2. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` and add your Supabase credentials (ask maintainers for dev credentials or create your own project).
-
-3. **Run database migrations** (if working on backend):
-   ```bash
-   supabase link --project-ref YOUR_PROJECT_ID
-   supabase db push
-   ```
-
-4. **Start development server:**
-   ```bash
    npm run dev
    ```
-   
-   Open `http://localhost:8080` in your browser.
 
----
+4. **Make Your Changes**
+   - Write clear, commented code
+   - Follow the existing code style
+   - Update documentation as needed
+   - Add tests if applicable
 
-## Development Workflow
-
-### Branch Strategy
-
-- `main`: Production-ready code
-- `develop`: Integration branch for features
-- `feature/description`: New features
-- `fix/description`: Bug fixes
-- `docs/description`: Documentation updates
-- `refactor/description`: Code refactoring
-
-### Creating a Feature Branch
-
-```bash
-# Sync with upstream
-git fetch upstream
-git checkout develop
-git merge upstream/develop
-
-# Create feature branch
-git checkout -b feature/amazing-feature
-```
-
-### Making Changes
-
-1. **Write code** following our [coding standards](#coding-standards)
-2. **Test your changes** (unit + integration tests)
-3. **Lint and type-check**:
+5. **Test Your Changes**
    ```bash
    npm run lint
-   npm run build  # Ensures TypeScript compiles
-   ```
-4. **Commit** with clear messages (see [Commit Messages](#commit-messages))
-5. **Push** to your fork:
-   ```bash
-   git push origin feature/amazing-feature
+   npm run build
    ```
 
-### Staying Up to Date
+6. **Commit Your Changes**
+   ```bash
+   git add .
+   git commit -m "feat: add amazing feature"
+   ```
+
+   Commit message format:
+   - `feat:` - New feature
+   - `fix:` - Bug fix
+   - `docs:` - Documentation changes
+   - `style:` - Code style changes (formatting, etc.)
+   - `refactor:` - Code refactoring
+   - `test:` - Adding or updating tests
+   - `chore:` - Maintenance tasks
+
+7. **Push to Your Fork**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+8. **Open a Pull Request**
+   - Go to the original repository
+   - Click "New Pull Request"
+   - Select your fork and branch
+   - Fill out the PR template
+   - Wait for review
+
+## Development Guidelines
+
+### Code Style
+
+We use ESLint to enforce code style. Before submitting, ensure your code passes linting:
 
 ```bash
-# Fetch latest changes
-git fetch upstream
-
-# Rebase your branch
-git checkout feature/amazing-feature
-git rebase upstream/develop
-
-# Resolve conflicts if any, then:
-git push origin feature/amazing-feature --force-with-lease
+npm run lint
 ```
 
----
+#### TypeScript Guidelines
 
-## Coding Standards
+- **Always use TypeScript** for new files
+- **Define interfaces** for all props and data structures
+- **Avoid `any` type** - use specific types or `unknown`
+- **Use strict mode** settings in tsconfig
+- **Export types** alongside components
 
-### TypeScript
-
-- **Use TypeScript** for all new files
-- **Strict mode** enabled (no `any` types unless absolutely necessary)
-- **Use interfaces** for object shapes, **types** for unions/primitives
-- **Prefer** `const` over `let`, avoid `var`
-
-**Example:**
+Example:
 ```typescript
 // Good
-interface User {
+interface UserProps {
   id: string;
   name: string;
   email: string;
 }
 
-function getUserById(id: string): User | null {
-  // ...
+export function UserCard({ id, name, email }: UserProps) {
+  // implementation
 }
 
 // Bad
-function getUser(id: any): any {
-  // ...
+export function UserCard(props: any) {
+  // implementation
 }
 ```
 
-### React
+#### React Guidelines
 
-- **Functional components** only (no class components)
-- **Use hooks** for state and side effects
-- **Destructure props** for clarity
-- **Memoize expensive computations** with `useMemo`
-- **Memoize callbacks** passed to children with `useCallback`
+- **Use functional components** with hooks
+- **Destructure props** in function parameters
+- **Use meaningful component names** (PascalCase)
+- **Keep components small** (< 200 lines)
+- **Extract logic** into custom hooks when appropriate
 
-**Example:**
+Example:
 ```typescript
 // Good
-interface ButtonProps {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}
-
-export function Button({ label, onClick, disabled = false }: ButtonProps) {
+export function ProductList({ products, onSelect }: ProductListProps) {
+  const [selected, setSelected] = useState<string[]>([]);
+  
   return (
-    <button onClick={onClick} disabled={disabled}>
-      {label}
-    </button>
+    // JSX
   );
 }
 
 // Bad
-export function Button(props: any) {
-  return <button onClick={props.onClick}>{props.label}</button>;
+export default function Component(props) {
+  return <div>{props.data}</div>;
+}
+```
+
+#### Component Structure
+
+Organize components consistently:
+
+```typescript
+// 1. Imports
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+// 2. Types/Interfaces
+interface ComponentProps {
+  title: string;
+}
+
+// 3. Constants
+const MAX_ITEMS = 10;
+
+// 4. Component
+export function Component({ title }: ComponentProps) {
+  // Hooks
+  const [state, setState] = useState(false);
+  
+  // Derived state
+  const computedValue = state ? "yes" : "no";
+  
+  // Handlers
+  const handleClick = () => {
+    setState(!state);
+  };
+  
+  // Render
+  return (
+    <div>
+      <h1>{title}</h1>
+      <Button onClick={handleClick}>{computedValue}</Button>
+    </div>
+  );
 }
 ```
 
@@ -214,216 +252,108 @@ export function Button(props: any) {
 ```
 src/
 ├── components/
-│   ├── ui/              # Base UI components (shadcn/ui)
-│   ├── layout/          # Layout components (AppLayout, Header, Sidebar)
-│   ├── dashboard/       # Dashboard-specific components
-│   ├── jobs/            # Job-related components
-│   └── [feature]/       # Feature-specific components
-├── pages/               # Route pages (one per route)
-├── hooks/               # Custom React hooks
-├── lib/                 # Utilities, helpers, constants
-└── integrations/        # External service integrations
-    └── supabase/        # Supabase client and types
-```
-
-### Naming Conventions
-
-- **Components**: PascalCase (`MetricCard.tsx`)
-- **Hooks**: camelCase with `use` prefix (`useJobQueue.ts`)
-- **Utilities**: camelCase (`formatDate.ts`)
-- **Constants**: SCREAMING_SNAKE_CASE (`MAX_RETRIES`)
-- **Types/Interfaces**: PascalCase (`JobStatus`, `UserProfile`)
-
-### Imports
-
-Use **absolute imports** with `@/` alias:
-
-```typescript
-// Good
-import { Button } from "@/components/ui/button";
-import { useJobQueue } from "@/hooks/useJobQueue";
-
-// Bad
-import { Button } from "../../components/ui/button";
-```
-
-**Import order**:
-1. React and external libraries
-2. Internal components
-3. Hooks
-4. Utilities
-5. Types
-6. Styles
-
-```typescript
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { useJobQueue } from "@/hooks/useJobQueue";
-import { formatDate } from "@/lib/utils";
-import type { Job } from "@/integrations/supabase/types";
-```
-
-### Comments
-
-- **Avoid obvious comments**
-- **Use JSDoc** for public functions
-- **Explain "why"**, not "what"
-
-```typescript
-// Good
-/**
- * Calculates exponential backoff delay for job retries.
- * @param attempt - The attempt number (0-indexed)
- * @returns Delay in milliseconds
- */
-export function exponentialBackoff(attempt: number): number {
-  return Math.min(1000 * Math.pow(2, attempt), 60000); // Cap at 1 minute
-}
-
-// Bad
-// This function calculates the delay
-function calculateDelay(a: number) {
-  return 1000 * Math.pow(2, a); // multiply by 2
-}
-```
-
----
-
-## Testing Guidelines
-
-### Test Structure
-
-We use **Vitest** for unit tests and **Playwright** for E2E tests.
-
-```
-src/
-├── components/
-│   └── Button.tsx
-│   └── Button.test.tsx     # Co-located tests
+│   ├── ui/              # shadcn/ui components (don't modify)
+│   ├── layout/          # Layout components
+│   ├── [feature]/       # Feature-specific components
+│   └── ComponentName.tsx
+├── pages/
+│   └── PageName.tsx     # One file per route
 ├── hooks/
-│   └── useJobQueue.ts
-│   └── useJobQueue.test.ts
-tests/
-└── e2e/
-    └── auth.spec.ts
+│   └── use-hook-name.ts # Custom hooks
+├── lib/
+│   └── utils.ts         # Utility functions
+└── integrations/
+    └── service/         # External service clients
 ```
 
-### Writing Unit Tests
+### Testing Guidelines
 
+When adding tests:
+
+1. **Place tests** next to the code they test
+2. **Use descriptive names** for test cases
+3. **Test behavior**, not implementation
+4. **Mock external dependencies**
+5. **Keep tests focused** and simple
+
+Example:
 ```typescript
-import { render, screen } from "@testing-library/react";
-import { Button } from "./Button";
-
-describe("Button", () => {
-  it("renders with label", () => {
-    render(<Button label="Click me" onClick={() => {}} />);
-    expect(screen.getByText("Click me")).toBeInTheDocument();
+describe('ProductCard', () => {
+  it('should display product title', () => {
+    // test implementation
   });
-
-  it("calls onClick when clicked", () => {
-    const onClick = vi.fn();
-    render(<Button label="Click" onClick={onClick} />);
-    screen.getByText("Click").click();
-    expect(onClick).toHaveBeenCalledTimes(1);
+  
+  it('should call onSelect when clicked', () => {
+    // test implementation
   });
 });
 ```
 
-### Running Tests
+### Documentation
 
-```bash
-# Unit tests
-npm run test
+- **Update README.md** if you change functionality
+- **Add JSDoc comments** for complex functions
+- **Update CHANGELOG.md** following Keep a Changelog format
+- **Include examples** in documentation
+- **Keep docs in sync** with code
 
-# E2E tests
-npm run test:e2e
-
-# Coverage
-npm run test:coverage
+Example:
+```typescript
+/**
+ * Formats a price value for display
+ * @param price - The numeric price value
+ * @param currency - The currency code (default: USD)
+ * @returns Formatted price string (e.g., "$29.99")
+ */
+export function formatPrice(price: number, currency = "USD"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(price);
+}
 ```
 
-### Test Coverage Goals
+## Project Structure
 
-- **Unit tests**: 70%+ coverage
-- **Integration tests**: Critical user flows
-- **E2E tests**: Happy paths and major features
+### Key Directories
 
----
+- **`src/components/`**: Reusable UI components
+- **`src/pages/`**: Top-level route components
+- **`src/hooks/`**: Custom React hooks
+- **`src/lib/`**: Utility functions and helpers
+- **`src/integrations/`**: External service integrations
+- **`public/`**: Static assets
 
-## Pull Request Process
+### Adding New Features
 
-### Before Submitting
+1. **Create components** in appropriate directory
+2. **Add types** in component file or separate `.types.ts`
+3. **Update routing** if adding new pages
+4. **Add navigation** links if needed
+5. **Write tests** for new functionality
+6. **Update documentation**
 
-- [ ] Code follows style guidelines
-- [ ] Tests added/updated and passing
-- [ ] Lint and type-check pass
-- [ ] Documentation updated (if needed)
-- [ ] Commit messages follow conventions
-- [ ] Branch rebased on latest `develop`
+### Component Guidelines
 
-### PR Title Format
+#### UI Components (`src/components/ui/`)
+- These are from shadcn/ui
+- **Don't modify** directly
+- If customization needed, wrap or extend
 
-Use [Conventional Commits](https://www.conventionalcommits.org/):
+#### Feature Components (`src/components/[feature]/`)
+- Group by feature (dashboard, jobs, approvals, etc.)
+- Keep feature-specific components together
+- Reuse UI components from `ui/`
 
-```
-<type>(<scope>): <description>
-
-feat(jobs): add retry button to failed jobs
-fix(auth): handle expired tokens correctly
-docs(readme): add setup instructions
-refactor(components): extract MetricCard component
-test(approval): add approval workflow tests
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation
-- `style`: Code style (formatting, whitespace)
-- `refactor`: Code refactoring
-- `test`: Adding tests
-- `chore`: Maintenance tasks
-
-### PR Description Template
-
-```markdown
-## Description
-Brief description of changes.
-
-## Motivation and Context
-Why is this change needed? What problem does it solve?
-
-## Changes Made
-- List key changes
-- Bullet points preferred
-
-## Screenshots (if UI changes)
-[Add screenshots here]
-
-## Testing Done
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] Manual testing completed
-
-## Checklist
-- [ ] Code follows style guidelines
-- [ ] Tests passing
-- [ ] Documentation updated
-- [ ] No breaking changes (or documented)
-```
-
-### Review Process
-
-1. **Automated checks** must pass (tests, lint, build)
-2. **At least 1 approval** from maintainers required
-3. **Address review comments** or explain why not
-4. **Squash and merge** (maintainers will do this)
-
----
+#### Page Components (`src/pages/`)
+- One file per route
+- Import and compose feature components
+- Handle route-level data fetching
+- Wrap in AppLayout
 
 ## Commit Messages
 
-### Format
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
 <type>(<scope>): <subject>
@@ -433,103 +363,57 @@ Why is this change needed? What problem does it solve?
 <footer>
 ```
 
-**Example:**
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation only
+- `style`: Code style (formatting, semicolons, etc.)
+- `refactor`: Code change that neither fixes a bug nor adds a feature
+- `perf`: Performance improvement
+- `test`: Adding or updating tests
+- `chore`: Maintenance (dependencies, config, etc.)
+
+**Examples:**
 ```
-feat(jobs): add manual retry functionality
+feat(dashboard): add real-time metric updates
 
-Users can now manually retry failed jobs from the Jobs page.
-This includes a new "Retry" button on each job row and a
-confirmation dialog to prevent accidental retries.
+fix(jobs): resolve retry logic for failed jobs
 
-Closes #42
+docs(readme): update installation instructions
+
+refactor(approvals): extract approval card to separate component
+
+test(products): add unit tests for product filtering
 ```
 
-### Guidelines
+## Review Process
 
-- **Subject line**: 50 chars max, imperative mood ("add" not "added")
-- **Body**: Wrap at 72 chars, explain what and why
-- **Footer**: Reference issues (`Closes #123`, `Fixes #456`)
+1. **Automated Checks**: CI will run linting and builds
+2. **Code Review**: Maintainers will review your code
+3. **Feedback**: Address any requested changes
+4. **Approval**: Once approved, PR will be merged
+5. **Release**: Changes included in next release
 
----
+### What We Look For
 
-## Issue Reporting
+- **Code quality**: Clean, readable, maintainable
+- **Tests**: Adequate test coverage
+- **Documentation**: Updated where needed
+- **Breaking changes**: Clearly documented
+- **Performance**: No unnecessary performance impacts
 
-### Bug Reports
+## Getting Help
 
-Use the bug report template and include:
+- **Documentation**: Check the `/docs` directory
+- **Issues**: Search existing issues first
+- **Discussions**: Use GitHub Discussions for questions
+- **Discord**: Join our community server (if available)
 
-- **Description**: What happened vs. what you expected
-- **Steps to reproduce**: Detailed steps
-- **Environment**: OS, browser, Node version
-- **Screenshots**: If applicable
-- **Logs**: Console errors, stack traces
-
-### Feature Requests
-
-Use the feature request template and include:
-
-- **Problem**: What problem does this solve?
-- **Proposed solution**: Your idea
-- **Alternatives**: Other solutions considered
-- **Additional context**: Mockups, examples
-
-### Good First Issues
-
-Look for issues labeled `good first issue` or `help wanted` to get started.
-
----
-
-## Community
-
-### Getting Help
-
-- **GitHub Discussions**: For questions and general discussion
-- **GitHub Issues**: For bugs and feature requests
-- **Discord** (coming soon): Real-time chat
-
-### Recognition
+## Recognition
 
 Contributors are recognized in:
-- `CONTRIBUTORS.md` file
+- README.md contributors section
 - Release notes
-- GitHub contributor graphs
+- GitHub contributors page
 
----
-
-## Development Tips
-
-### Debugging
-
-- Use **React DevTools** for component inspection
-- Use **TanStack Query DevTools** for query debugging
-- Use **Supabase Studio** for database queries
-
-### Performance
-
-- Use **React DevTools Profiler** to identify slow renders
-- Use **Chrome DevTools Performance** tab for runtime analysis
-- Lazy load pages with `React.lazy` for code splitting
-
-### VS Code Extensions (Recommended)
-
-- **ESLint**: Real-time linting
-- **Prettier**: Code formatting
-- **TypeScript** (built-in): Type checking
-- **Tailwind CSS IntelliSense**: Tailwind autocomplete
-- **Error Lens**: Inline error display
-
----
-
-## Questions?
-
-If you have questions not covered here:
-
-1. Check [README.md](./README.md) and [ARCHITECTURE.md](./ARCHITECTURE.md)
-2. Search existing [GitHub Issues](https://github.com/Krosebrook/fusion-stage-hub/issues)
-3. Ask in [GitHub Discussions](https://github.com/Krosebrook/fusion-stage-hub/discussions)
-
----
-
-**Thank you for contributing!** 🎉
-
-Your time and effort make this project better for everyone.
+Thank you for contributing to FlashFusion! 🚀
