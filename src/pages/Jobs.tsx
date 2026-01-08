@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { JobStatusBadge } from "@/components/jobs/JobStatusBadge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,43 +19,154 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, RefreshCw, Play, Pause, Trash2 } from "lucide-react";
+import { Search, RefreshCw, Play, Pause, Trash2, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import type { Database } from "@/integrations/supabase/types";
 
-type JobStatus = "pending" | "claimed" | "running" | "completed" | "failed" | "cancelled";
-
-interface Job {
-  id: string;
-  type: string;
-  store: string;
-  status: JobStatus;
-  attempts: number;
-  maxAttempts: number;
-  createdAt: Date;
-  scheduledAt: Date;
-}
-
-const mockJobs: Job[] = [
-  { id: "job-001", type: "sync_inventory", store: "Shopify Main", status: "completed", attempts: 1, maxAttempts: 3, createdAt: new Date(Date.now() - 1000 * 60 * 30), scheduledAt: new Date(Date.now() - 1000 * 60 * 35) },
-  { id: "job-002", type: "publish_listing", store: "Etsy Vintage", status: "running", attempts: 1, maxAttempts: 3, createdAt: new Date(Date.now() - 1000 * 60 * 5), scheduledAt: new Date(Date.now() - 1000 * 60 * 5) },
-  { id: "job-003", type: "import_orders", store: "Amazon SC", status: "pending", attempts: 0, maxAttempts: 3, createdAt: new Date(Date.now() - 1000 * 60 * 2), scheduledAt: new Date(Date.now() + 1000 * 60 * 5) },
-  { id: "job-004", type: "update_prices", store: "Printify", status: "failed", attempts: 3, maxAttempts: 3, createdAt: new Date(Date.now() - 1000 * 60 * 60), scheduledAt: new Date(Date.now() - 1000 * 60 * 60) },
-  { id: "job-005", type: "reconcile_stock", store: "Amazon KDP", status: "pending", attempts: 0, maxAttempts: 5, createdAt: new Date(Date.now() - 1000 * 60 * 1), scheduledAt: new Date(Date.now() + 1000 * 60 * 10) },
-  { id: "job-006", type: "webhook_process", store: "Gumroad", status: "completed", attempts: 1, maxAttempts: 3, createdAt: new Date(Date.now() - 1000 * 60 * 45), scheduledAt: new Date(Date.now() - 1000 * 60 * 45) },
-];
+type JobStatus = Database["public"]["Enums"]["job_status"];
+type Job = Database["public"]["Tables"]["jobs"]["Row"];
 
 export default function Jobs() {
-  const [jobs] = useState<Job[]>(mockJobs);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [retryingJob, setRetryingJob] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Fetch jobs
+  const fetchJobs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setJobs(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error fetching jobs",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Setup realtime subscription
+  useEffect(() => {
+    fetchJobs();
+
+    const channel = supabase
+      .channel("jobs-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "jobs",
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setJobs((prev) => [payload.new as Job, ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            setJobs((prev) =>
+              prev.map((job) =>
+                job.id === (payload.new as Job).id ? (payload.new as Job) : job
+              )
+            );
+          } else if (payload.eventType === "DELETE") {
+            setJobs((prev) =>
+              prev.filter((job) => job.id !== (payload.old as Job).id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Retry a failed job
+  const handleRetry = async (job: Job) => {
+    setRetryingJob(job.id);
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({
+          status: "pending" as JobStatus,
+          attempts: 0,
+          last_error: null,
+          scheduled_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Job requeued",
+        description: `Job ${job.id.slice(0, 8)} has been requeued for processing.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error retrying job",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRetryingJob(null);
+    }
+  };
+
+  // Cancel a job
+  const handleCancel = async (job: Job) => {
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({
+          status: "cancelled" as JobStatus,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Job cancelled",
+        description: `Job ${job.id.slice(0, 8)} has been cancelled.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error cancelling job",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredJobs = jobs.filter((job) => {
     const matchesFilter = filter === "all" || job.status === filter;
-    const matchesSearch = job.type.toLowerCase().includes(search.toLowerCase()) ||
-      job.store.toLowerCase().includes(search.toLowerCase()) ||
-      job.id.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch =
+      job.job_type.toLowerCase().includes(search.toLowerCase()) ||
+      job.id.toLowerCase().includes(search.toLowerCase()) ||
+      (job.store_id && job.store_id.toLowerCase().includes(search.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
+
+  const statusCounts = jobs.reduce(
+    (acc, job) => {
+      acc[job.status] = (acc[job.status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
 
   return (
     <AppLayout>
@@ -79,6 +190,30 @@ export default function Jobs() {
           </div>
         </div>
 
+        {/* Status summary */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          {(["pending", "claimed", "running", "completed", "failed", "cancelled"] as JobStatus[]).map(
+            (status) => (
+              <Card
+                key={status}
+                className={`cursor-pointer transition-colors ${
+                  filter === status ? "border-primary" : ""
+                }`}
+                onClick={() => setFilter(filter === status ? "all" : status)}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <JobStatusBadge status={status} />
+                    <span className="text-lg font-semibold">
+                      {statusCounts[status] || 0}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          )}
+        </div>
+
         <Card className="bg-card border-border">
           <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row gap-4">
@@ -98,62 +233,102 @@ export default function Jobs() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="claimed">Claimed</SelectItem>
                   <SelectItem value="running">Running</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon">
-                <RefreshCw className="w-4 h-4" />
+              <Button variant="outline" size="icon" onClick={fetchJobs} disabled={loading}>
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="font-semibold">Job ID</TableHead>
-                    <TableHead className="font-semibold">Type</TableHead>
-                    <TableHead className="font-semibold">Store</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold">Attempts</TableHead>
-                    <TableHead className="font-semibold">Scheduled</TableHead>
-                    <TableHead className="font-semibold text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredJobs.map((job) => (
-                    <TableRow key={job.id} className="hover:bg-muted/20">
-                      <TableCell className="font-mono text-xs">{job.id}</TableCell>
-                      <TableCell className="capitalize">{job.type.replace(/_/g, " ")}</TableCell>
-                      <TableCell>{job.store}</TableCell>
-                      <TableCell>
-                        <JobStatusBadge status={job.status} />
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {job.attempts}/{job.maxAttempts}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {formatDistanceToNow(job.scheduledAt, { addSuffix: true })}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {job.status === "failed" && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <RefreshCw className="w-4 h-4" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredJobs.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No jobs found</p>
+                <p className="text-sm mt-1">Jobs will appear here when created</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="font-semibold">Job ID</TableHead>
+                      <TableHead className="font-semibold">Type</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold">Attempts</TableHead>
+                      <TableHead className="font-semibold">Priority</TableHead>
+                      <TableHead className="font-semibold">Scheduled</TableHead>
+                      <TableHead className="font-semibold">Error</TableHead>
+                      <TableHead className="font-semibold text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredJobs.map((job) => (
+                      <TableRow key={job.id} className="hover:bg-muted/20">
+                        <TableCell className="font-mono text-xs">
+                          {job.id.slice(0, 8)}...
+                        </TableCell>
+                        <TableCell className="capitalize">
+                          {job.job_type.replace(/_/g, " ")}
+                        </TableCell>
+                        <TableCell>
+                          <JobStatusBadge status={job.status} />
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {job.attempts}/{job.max_attempts}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{job.priority}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {formatDistanceToNow(new Date(job.scheduled_at), {
+                            addSuffix: true,
+                          })}
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate text-sm text-destructive">
+                          {job.last_error || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            {(job.status === "failed" || job.status === "cancelled") && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleRetry(job)}
+                                disabled={retryingJob === job.id}
+                              >
+                                {retryingJob === job.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
+                            {(job.status === "pending" || job.status === "claimed") && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleCancel(job)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
