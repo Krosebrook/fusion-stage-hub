@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.webhooks-ingest]
 verify_jwt = false
+
+[functions.reconcile-run]
+verify_jwt = false
+
+[functions.etsy-api]
+verify_jwt = false
+
+[functions.amazon-sp-api]
+verify_jwt = false
