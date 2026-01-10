@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,6 +33,7 @@ const navItems = [
   { icon: Rocket, label: "Publishing", path: "/publishing" },
   { icon: Settings, label: "Settings", path: "/settings" },
   { icon: FileText, label: "Audit Logs", path: "/audit" },
+  { icon: User, label: "Profile", path: "/profile" },
 ];
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
