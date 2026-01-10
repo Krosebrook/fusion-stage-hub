@@ -44,8 +44,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Search, Plus, Upload, Filter, MoreHorizontal, Image, ChevronDown, Loader2, Package } from "lucide-react";
+import { Search, Plus, Upload, Filter, MoreHorizontal, Image, ChevronDown, Loader2, Package, ImagePlus } from "lucide-react";
 import { useProducts, ProductWithDetails } from "@/hooks/useProducts";
+import { supabase } from "@/integrations/supabase/client";
+import { ProductMediaManager } from "@/components/products/ProductMediaManager";
+import { ProductImportDialog } from "@/components/products/ProductImportDialog";
 
 export default function Products() {
   const { products, isLoading, createProduct, updateProduct, deleteProduct, createVariant, deleteVariant } = useProducts();
@@ -58,6 +61,8 @@ export default function Products() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isVariantOpen, setIsVariantOpen] = useState(false);
+  const [isMediaOpen, setIsMediaOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithDetails | null>(null);
   
   // Form states
@@ -178,6 +183,17 @@ export default function Products() {
     setIsVariantOpen(true);
   };
 
+  const openMediaDialog = (product: ProductWithDetails) => {
+    setSelectedProduct(product);
+    setIsMediaOpen(true);
+  };
+
+  const handleBulkImport = async (productsToInsert: any[]) => {
+    for (const product of productsToInsert) {
+      await createProduct(product);
+    }
+  };
+
   const getTotalInventory = (product: ProductWithDetails) => {
     return product.variants.reduce((sum, v) => sum + (v.inventory_quantity || 0), 0);
   };
@@ -208,7 +224,7 @@ export default function Products() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setIsImportOpen(true)}>
               <Upload className="w-4 h-4 mr-1" />
               Import
             </Button>
@@ -342,6 +358,10 @@ export default function Products() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => openEdit(product)}>
                                     Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openMediaDialog(product)}>
+                                    <ImagePlus className="w-4 h-4 mr-2" />
+                                    Manage Media
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => openVariantDialog(product)}>
                                     Add Variant
@@ -605,6 +625,24 @@ export default function Products() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Media Manager */}
+      {selectedProduct && (
+        <ProductMediaManager
+          productId={selectedProduct.id}
+          orgId={selectedProduct.org_id}
+          open={isMediaOpen}
+          onOpenChange={setIsMediaOpen}
+        />
+      )}
+
+      {/* Import Dialog */}
+      <ProductImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onImport={handleBulkImport}
+        orgId={products[0]?.org_id || ""}
+      />
     </AppLayout>
   );
 }
