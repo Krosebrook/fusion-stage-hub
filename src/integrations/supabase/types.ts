@@ -375,6 +375,169 @@ export type Database = {
           },
         ]
       }
+      order_items: {
+        Row: {
+          created_at: string
+          fulfilled_quantity: number
+          id: string
+          metadata: Json | null
+          order_id: string
+          product_id: string | null
+          quantity: number
+          sku: string | null
+          title: string
+          total_price: number
+          unit_price: number
+          variant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          fulfilled_quantity?: number
+          id?: string
+          metadata?: Json | null
+          order_id: string
+          product_id?: string | null
+          quantity?: number
+          sku?: string | null
+          title: string
+          total_price?: number
+          unit_price?: number
+          variant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          fulfilled_quantity?: number
+          id?: string
+          metadata?: Json | null
+          order_id?: string
+          product_id?: string | null
+          quantity?: number
+          sku?: string | null
+          title?: string
+          total_price?: number
+          unit_price?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          billing_address: Json | null
+          created_at: string
+          currency: string
+          customer_email: string | null
+          customer_name: string | null
+          delivered_at: string | null
+          external_id: string | null
+          fulfillment_status: Database["public"]["Enums"]["fulfillment_status"]
+          id: string
+          line_items: Json
+          metadata: Json | null
+          notes: string | null
+          order_number: string
+          org_id: string
+          placed_at: string | null
+          shipped_at: string | null
+          shipping: number
+          shipping_address: Json | null
+          status: Database["public"]["Enums"]["order_status"]
+          store_id: string | null
+          subtotal: number
+          tax: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          billing_address?: Json | null
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          delivered_at?: string | null
+          external_id?: string | null
+          fulfillment_status?: Database["public"]["Enums"]["fulfillment_status"]
+          id?: string
+          line_items?: Json
+          metadata?: Json | null
+          notes?: string | null
+          order_number: string
+          org_id: string
+          placed_at?: string | null
+          shipped_at?: string | null
+          shipping?: number
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["order_status"]
+          store_id?: string | null
+          subtotal?: number
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          billing_address?: Json | null
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          delivered_at?: string | null
+          external_id?: string | null
+          fulfillment_status?: Database["public"]["Enums"]["fulfillment_status"]
+          id?: string
+          line_items?: Json
+          metadata?: Json | null
+          notes?: string | null
+          order_number?: string
+          org_id?: string
+          placed_at?: string | null
+          shipped_at?: string | null
+          shipping?: number
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["order_status"]
+          store_id?: string | null
+          subtotal?: number
+          tax?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_members: {
         Row: {
           created_at: string
@@ -911,6 +1074,7 @@ export type Database = {
     Enums: {
       approval_status: "pending" | "approved" | "rejected" | "expired"
       capability_level: "native" | "workaround" | "unsupported"
+      fulfillment_status: "unfulfilled" | "partial" | "fulfilled"
       job_status:
         | "pending"
         | "claimed"
@@ -925,6 +1089,14 @@ export type Database = {
         | "published"
         | "failed"
         | "delisted"
+      order_status:
+        | "pending"
+        | "confirmed"
+        | "processing"
+        | "shipped"
+        | "delivered"
+        | "cancelled"
+        | "refunded"
       org_member_role: "owner" | "operator" | "viewer"
       settings_scope:
         | "global"
@@ -1062,6 +1234,7 @@ export const Constants = {
     Enums: {
       approval_status: ["pending", "approved", "rejected", "expired"],
       capability_level: ["native", "workaround", "unsupported"],
+      fulfillment_status: ["unfulfilled", "partial", "fulfilled"],
       job_status: [
         "pending",
         "claimed",
@@ -1077,6 +1250,15 @@ export const Constants = {
         "published",
         "failed",
         "delisted",
+      ],
+      order_status: [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "refunded",
       ],
       org_member_role: ["owner", "operator", "viewer"],
       settings_scope: ["global", "org", "store", "plugin_instance", "workflow"],

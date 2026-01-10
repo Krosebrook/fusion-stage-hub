@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Zap,
   User,
+  ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -26,6 +27,7 @@ interface SidebarProps {
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: CheckCircle2, label: "Approvals", path: "/approvals" },
+  { icon: ShoppingCart, label: "Orders", path: "/orders" },
   { icon: Layers, label: "Jobs", path: "/jobs" },
   { icon: Store, label: "Stores", path: "/stores" },
   { icon: Plug, label: "Plugins", path: "/plugins" },

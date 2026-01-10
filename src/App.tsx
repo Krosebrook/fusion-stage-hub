@@ -16,7 +16,14 @@ import Settings from "./pages/Settings";
 import Audit from "./pages/Audit";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
+import Orders from "./pages/Orders";
 import NotFound from "./pages/NotFound";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
+
+function AppWithNotifications() {
+  useRealtimeNotifications();
+  return null;
+}
 
 const queryClient = new QueryClient();
 
@@ -27,6 +34,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <AppWithNotifications />
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
@@ -109,6 +117,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                <ProtectedRoute>
+                  <Orders />
                 </ProtectedRoute>
               }
             />
