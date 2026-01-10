@@ -15,6 +15,8 @@ import {
   Zap,
   User,
   ShoppingCart,
+  Webhook,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -29,9 +31,11 @@ const navItems = [
   { icon: CheckCircle2, label: "Approvals", path: "/approvals" },
   { icon: ShoppingCart, label: "Orders", path: "/orders" },
   { icon: Layers, label: "Jobs", path: "/jobs" },
+  { icon: Webhook, label: "Webhooks", path: "/webhooks" },
   { icon: Store, label: "Stores", path: "/stores" },
   { icon: Plug, label: "Plugins", path: "/plugins" },
   { icon: Package, label: "Products", path: "/products" },
+  { icon: DollarSign, label: "Budgets", path: "/budgets" },
   { icon: Rocket, label: "Publishing", path: "/publishing" },
   { icon: Settings, label: "Settings", path: "/settings" },
   { icon: FileText, label: "Audit Logs", path: "/audit" },

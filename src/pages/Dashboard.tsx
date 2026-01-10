@@ -14,6 +14,8 @@ import {
   ArrowRight,
   Clock,
   RefreshCw,
+  ShoppingCart,
+  DollarSign,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -67,10 +69,10 @@ export default function Dashboard() {
         </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 stagger-children">
           {isLoading ? (
             <>
-              {[1, 2, 3, 4].map((i) => (
+              {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Skeleton key={i} className="h-32" />
               ))}
             </>
@@ -120,6 +122,28 @@ export default function Dashboard() {
                 trend={
                   metrics.stagedProducts > 0
                     ? { value: metrics.stagedProducts, isPositive: true }
+                    : undefined
+                }
+              />
+              <MetricCard
+                title="Orders Today"
+                value={metrics.ordersToday}
+                subtitle={`${metrics.totalOrders} total orders`}
+                icon={ShoppingCart}
+                trend={
+                  metrics.ordersToday > 0
+                    ? { value: metrics.ordersToday, isPositive: true }
+                    : undefined
+                }
+              />
+              <MetricCard
+                title="Revenue Today"
+                value={`$${metrics.revenueToday.toFixed(0)}`}
+                subtitle={`$${metrics.totalRevenue.toFixed(0)} total`}
+                icon={DollarSign}
+                trend={
+                  metrics.revenueToday > 0
+                    ? { value: Math.round(metrics.revenueToday), isPositive: true }
                     : undefined
                 }
               />

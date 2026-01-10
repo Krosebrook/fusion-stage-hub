@@ -12,6 +12,10 @@ interface DashboardMetrics {
   healthyStores: number;
   totalProducts: number;
   stagedProducts: number;
+  totalOrders: number;
+  ordersToday: number;
+  totalRevenue: number;
+  revenueToday: number;
 }
 
 interface RecentJob {
@@ -51,6 +55,10 @@ export function useRealtimeMetrics() {
     healthyStores: 0,
     totalProducts: 0,
     stagedProducts: 0,
+    totalOrders: 0,
+    ordersToday: 0,
+    totalRevenue: 0,
+    revenueToday: 0,
   });
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
@@ -71,6 +79,7 @@ export function useRealtimeMetrics() {
         listingsResult,
         recentJobsResult,
         pendingApprovalsResult,
+        ordersResult,
       ] = await Promise.all([
         // Pending approvals count
         supabase
@@ -101,6 +110,10 @@ export function useRealtimeMetrics() {
           .eq("status", "pending")
           .order("created_at", { ascending: false })
           .limit(5),
+        // Orders with revenue
+        supabase
+          .from("orders")
+          .select("id, total, placed_at, status"),
       ]);
 
       // Calculate expiring approvals (within 24 hours)
@@ -135,6 +148,22 @@ export function useRealtimeMetrics() {
         return hoursSinceSync < 24;
       }).length;
 
+      // Order stats
+      const orders = ordersResult.data || [];
+      const ordersToday = orders.filter(
+        (o) => o.placed_at && new Date(o.placed_at) >= todayStart
+      ).length;
+      const totalRevenue = orders
+        .filter(o => !["cancelled", "refunded"].includes(o.status))
+        .reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const revenueToday = orders
+        .filter(o => 
+          o.placed_at && 
+          new Date(o.placed_at) >= todayStart && 
+          !["cancelled", "refunded"].includes(o.status)
+        )
+        .reduce((sum, o) => sum + Number(o.total || 0), 0);
+
       setMetrics({
         pendingApprovals: approvalsResult.count || 0,
         expiringApprovals: expiringCount,
@@ -146,6 +175,10 @@ export function useRealtimeMetrics() {
         healthyStores,
         totalProducts: productsResult.count || 0,
         stagedProducts: listingsResult.count || 0,
+        totalOrders: orders.length,
+        ordersToday,
+        totalRevenue,
+        revenueToday,
       });
 
       setRecentJobs(recentJobsResult.data || []);
@@ -207,12 +240,22 @@ export function useRealtimeMetrics() {
       )
       .subscribe();
 
+    const ordersChannel = supabase
+      .channel("dashboard-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => fetchMetrics()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(jobsChannel);
       supabase.removeChannel(approvalsChannel);
       supabase.removeChannel(storesChannel);
       supabase.removeChannel(productsChannel);
       supabase.removeChannel(listingsChannel);
+      supabase.removeChannel(ordersChannel);
     };
   }, [fetchMetrics]);
 
