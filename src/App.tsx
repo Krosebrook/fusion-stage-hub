@@ -17,6 +17,8 @@ import Audit from "./pages/Audit";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Orders from "./pages/Orders";
+import Webhooks from "./pages/Webhooks";
+import Budgets from "./pages/Budgets";
 import NotFound from "./pages/NotFound";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
@@ -125,6 +127,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Orders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/webhooks"
+              element={
+                <ProtectedRoute>
+                  <Webhooks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/budgets"
+              element={
+                <ProtectedRoute>
+                  <Budgets />
                 </ProtectedRoute>
               }
             />
